@@ -31,9 +31,14 @@ Plugin::Plugin()
 Plugin::~Plugin()
 {}
 
-Interface::Holder Plugin::open(const Interface::Holder &file, Error &error) const
+Interface::Holder Plugin::open(const Interface::Holder &file) const
 {
     return Interface::Holder(new (std::nothrow) Archive(file));
+}
+
+const Error &Plugin::lastError() const
+{
+    return m_error;
 }
 
 void Plugin::registered()

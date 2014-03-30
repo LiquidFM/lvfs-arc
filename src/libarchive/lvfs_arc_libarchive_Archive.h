@@ -31,7 +31,7 @@ namespace LVFS {
 namespace Arc {
 namespace LibArchive {
 
-class Archive : public Implements<IFile, IDirectory, IEntry, IFsFile, IArchive>
+class PLATFORM_MAKE_PRIVATE Archive : public Implements<IFile, IDirectory, IEntry, IFsFile, IArchive>
 {
 public:
     Archive(const Interface::Holder &file);

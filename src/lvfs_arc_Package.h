@@ -26,7 +26,7 @@
 namespace LVFS {
 namespace Arc {
 
-class Package : public ::LVFS::Package
+class PLATFORM_MAKE_PRIVATE Package : public ::LVFS::Package
 {
     PLATFORM_MAKE_NONCOPYABLE(Package)
     PLATFORM_MAKE_NONMOVEABLE(Package)
@@ -37,8 +37,8 @@ public:
     virtual ~Package();
 
     virtual const char *name() const;
-    virtual const DataPlugin *dataPlugins() const;
-    virtual const RootPlugin *rootPlugins() const;
+    virtual const DataPlugin **dataPlugins() const;
+    virtual const RootPlugin **rootPlugins() const;
 };
 
 }}

@@ -35,7 +35,7 @@ const char *Package::name() const
     return "Arc";
 }
 
-const Package::DataPlugin *Package::dataPlugins() const
+const Package::DataPlugin **Package::dataPlugins() const
 {
     static const LibArchive::Plugin libArchive;
 
@@ -61,18 +61,22 @@ const Package::DataPlugin *Package::dataPlugins() const
         { "application/x-lzma-compressed-tar", &libArchive },
         { "application/x-cd-image",            &libArchive }
     };
+    enum { Count = sizeof(types) / sizeof(DataPlugin) };
 
-    static const DataPlugin *res[sizeof(types) + 1] = {};
+    static const DataPlugin *res[Count + 1] = {};
 
-    for (unsigned i = 0; i < sizeof(types); ++i)
+    for (unsigned i = 0; i < Count; ++i)
         res[i] = &types[i];
 
-    return res[0];
+    return res;
 }
 
-const Package::RootPlugin *Package::rootPlugins() const
+const Package::RootPlugin **Package::rootPlugins() const
 {
     return NULL;
 }
 
 }}
+
+
+DECLARE_PLUGIN(::LVFS::Arc::Package)

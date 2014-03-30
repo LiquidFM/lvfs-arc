@@ -4,6 +4,8 @@ project (lvfs-arc)
 project_cxx_library_header_default ()
 
 # 3rdparty
+list (APPEND ${PROJECT_NAME}_LIBS brolly)
+list (APPEND ${PROJECT_NAME}_LIBS efc)
 list (APPEND ${PROJECT_NAME}_LIBS lvfs)
 
 find_package (LibArchive REQUIRED)
@@ -18,7 +20,7 @@ list (APPEND ${PROJECT_NAME}_LIBS ${LIBUNRAR_LIBRARY})
 add_subdirectory (src)
 
 # Target - lvfs-arc
-add_library(lvfs-arc STATIC ${${PROJECT_NAME}_SOURCES})
+add_library(lvfs-arc SHARED ${${PROJECT_NAME}_SOURCES})
 target_link_libraries (lvfs-arc ${${PROJECT_NAME}_LIBS})
 
 # Version

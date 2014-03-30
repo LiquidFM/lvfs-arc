@@ -26,7 +26,7 @@
 namespace LVFS {
 namespace Arc {
 
-class IArchive
+class PLATFORM_MAKE_PUBLIC IArchive
 {
     DECLARE_INTERFACE(LVFS::Arc::IArchive)
 

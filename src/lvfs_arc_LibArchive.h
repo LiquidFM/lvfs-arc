@@ -20,7 +20,6 @@
 #ifndef LVFS_ARC_LIBARCHIVE_H_
 #define LVFS_ARC_LIBARCHIVE_H_
 
-#include <lvfs/Error>
 #include <lvfs/plugins/IDataPlugin>
 
 
@@ -28,7 +27,7 @@ namespace LVFS {
 namespace Arc {
 namespace LibArchive {
 
-class Plugin : public IDataPlugin
+class PLATFORM_MAKE_PRIVATE Plugin : public IDataPlugin
 {
     PLATFORM_MAKE_NONCOPYABLE(Plugin)
     PLATFORM_MAKE_NONMOVEABLE(Plugin)
@@ -38,9 +37,13 @@ public:
     Plugin();
     virtual ~Plugin();
 
-    virtual Interface::Holder open(const Interface::Holder &file, Error &error) const;
+    virtual Interface::Holder open(const Interface::Holder &file) const;
+    virtual const Error &lastError() const;
 
     virtual void registered();
+
+private:
+    Error m_error;
 };
 
 }}}

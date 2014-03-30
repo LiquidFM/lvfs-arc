@@ -125,6 +125,7 @@ public:
         {
             archive_read_free(m_archive);
             m_archive = NULL;
+            m_entry = NULL;
         }
     }
 
