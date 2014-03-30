@@ -22,25 +22,20 @@
 
 #include <cstdio>
 #include <lvfs/IFile>
+#include <lvfs/IFsFile>
 #include <lvfs/IDirectory>
-#include <lvfs/plugins/fs/IPermissions>
-#include <lvfs/Interface>
-#include <lvfs/Error>
+#include <lvfs-arc/IArchive>
 
 
 namespace LVFS {
 namespace Arc {
 namespace LibArchive {
 
-class File : public IPermissions, public IFile, public IDirectory, public IEntry
+class Archive : public Implements<IFile, IDirectory, IEntry, IFsFile, IArchive>
 {
 public:
-    File(const Interface::Holder &file);
-    virtual ~File();
-
-    /* IPermissions */
-
-    virtual int permissions() const;
+    Archive(const Interface::Holder &file);
+    virtual ~Archive();
 
     /* IFile */
 
@@ -65,8 +60,23 @@ public:
 
     /* IEntry */
 
-    virtual const char *title() const;
     virtual const char *type() const;
+    virtual const char *title() const;
+    virtual const char *location() const;
+
+    /* IFsFile */
+
+    virtual time_t cTime() const;
+    virtual time_t mTime() const;
+    virtual time_t aTime() const;
+
+    virtual int permissions() const;
+    virtual bool setPermissions(int value);
+
+    /* IArchive */
+
+    virtual const char *password() const;
+    virtual void setPassword(const char *value);
 
     /* COMMON */
 
@@ -74,8 +84,9 @@ public:
 
 private:
     Interface::Holder m_file;
+    char *m_password;
     mutable Error m_error;
-    mutable Error *m_lastError;
+    mutable const Error *m_lastError;
 };
 
 }}}

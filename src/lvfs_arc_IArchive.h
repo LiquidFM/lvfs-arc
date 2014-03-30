@@ -17,28 +17,26 @@
  * along with lvfs-arc. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lvfs_arc_LibArchive.h"
-#include "libarchive/lvfs_arc_libarchive_Archive.h"
+#ifndef LVFS_ARC_IARCHIVE_H_
+#define LVFS_ARC_IARCHIVE_H_
+
+#include <lvfs/Interface>
 
 
 namespace LVFS {
 namespace Arc {
-namespace LibArchive {
 
-Plugin::Plugin()
-{}
-
-Plugin::~Plugin()
-{}
-
-Interface::Holder Plugin::open(const Interface::Holder &file, Error &error) const
+class IArchive
 {
-    return Interface::Holder(new (std::nothrow) Archive(file));
-}
+    DECLARE_INTERFACE(LVFS::Arc::IArchive)
 
-void Plugin::registered()
-{
+public:
+    virtual ~IArchive();
 
-}
+    virtual const char *password() const = 0;
+    virtual void setPassword(const char *value) = 0;
+};
 
-}}}
+}}
+
+#endif /* LVFS_ARC_IARCHIVE_H_ */

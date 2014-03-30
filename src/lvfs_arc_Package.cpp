@@ -37,21 +37,35 @@ const char *Package::name() const
 
 const Package::DataPlugin *Package::dataPlugins() const
 {
-    static const LibArchive libArchive;
+    static const LibArchive::Plugin libArchive;
 
     static const DataPlugin types[] =
     {
-        { "application/zip",    &libArchive },
-        { "application/x-gzip", &libArchive },
-        NULL
+        { "application/x-gzip",                &libArchive },
+        { "application/x-tar",                 &libArchive },
+        { "application/x-compressed-tar",      &libArchive },
+        { "application/x-bzip-compressed-tar", &libArchive },
+        { "application/zip",                   &libArchive },
+        { "application/x-bzip",                &libArchive },
+        { "application/x-tarz",                &libArchive },
+        { "application/x-bzip2",               &libArchive },
+        { "application/x-java-archive",        &libArchive },
+        { "application/x-deb",                 &libArchive },
+        { "application/x-rpm",                 &libArchive },
+        { "application/x-7z-compressed",       &libArchive },
+        { "application/x-compress",            &libArchive },
+        { "application/x-zip-compressed",      &libArchive },
+        { "application/x-lzma",                &libArchive },
+        { "application/x-servicepack",         &libArchive },
+        { "application/x-xz-compressed-tar",   &libArchive },
+        { "application/x-lzma-compressed-tar", &libArchive },
+        { "application/x-cd-image",            &libArchive }
     };
 
-    static const DataPlugin *res[] =
-    {
-        &types[0],
-        &types[1],
-        NULL
-    };
+    static const DataPlugin *res[sizeof(types) + 1] = {};
+
+    for (unsigned i = 0; i < sizeof(types); ++i)
+        res[i] = &types[i];
 
     return res[0];
 }
