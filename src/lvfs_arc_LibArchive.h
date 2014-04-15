@@ -20,14 +20,14 @@
 #ifndef LVFS_ARC_LIBARCHIVE_H_
 #define LVFS_ARC_LIBARCHIVE_H_
 
-#include <lvfs/plugins/IDataPlugin>
+#include <lvfs/plugins/IContentPlugin>
 
 
 namespace LVFS {
 namespace Arc {
 namespace LibArchive {
 
-class PLATFORM_MAKE_PRIVATE Plugin : public IDataPlugin
+class PLATFORM_MAKE_PRIVATE Plugin : public Implements<IContentPlugin>
 {
     PLATFORM_MAKE_NONCOPYABLE(Plugin)
     PLATFORM_MAKE_NONMOVEABLE(Plugin)

@@ -35,35 +35,35 @@ const char *Package::name() const
     return "Arc";
 }
 
-const Package::DataPlugin **Package::dataPlugins() const
+const Package::Plugin **Package::contentPlugins() const
 {
     static const LibArchive::Plugin libArchive;
 
-    static const DataPlugin types[] =
+    static const Plugin types[] =
     {
-        { "application/x-gzip",                &libArchive },
-        { "application/x-tar",                 &libArchive },
-        { "application/x-compressed-tar",      &libArchive },
-        { "application/x-bzip-compressed-tar", &libArchive },
-        { "application/zip",                   &libArchive },
-        { "application/x-bzip",                &libArchive },
-        { "application/x-tarz",                &libArchive },
-        { "application/x-bzip2",               &libArchive },
-        { "application/x-java-archive",        &libArchive },
-        { "application/x-deb",                 &libArchive },
-        { "application/x-rpm",                 &libArchive },
-        { "application/x-7z-compressed",       &libArchive },
-        { "application/x-compress",            &libArchive },
-        { "application/x-zip-compressed",      &libArchive },
-        { "application/x-lzma",                &libArchive },
-        { "application/x-servicepack",         &libArchive },
-        { "application/x-xz-compressed-tar",   &libArchive },
-        { "application/x-lzma-compressed-tar", &libArchive },
-        { "application/x-cd-image",            &libArchive }
+        { "application/x-gzip",                libArchive },
+        { "application/x-tar",                 libArchive },
+        { "application/x-compressed-tar",      libArchive },
+        { "application/x-bzip-compressed-tar", libArchive },
+        { "application/zip",                   libArchive },
+        { "application/x-bzip",                libArchive },
+        { "application/x-tarz",                libArchive },
+        { "application/x-bzip2",               libArchive },
+        { "application/x-java-archive",        libArchive },
+        { "application/x-deb",                 libArchive },
+        { "application/x-rpm",                 libArchive },
+        { "application/x-7z-compressed",       libArchive },
+        { "application/x-compress",            libArchive },
+        { "application/x-zip-compressed",      libArchive },
+        { "application/x-lzma",                libArchive },
+        { "application/x-servicepack",         libArchive },
+        { "application/x-xz-compressed-tar",   libArchive },
+        { "application/x-lzma-compressed-tar", libArchive },
+        { "application/x-cd-image",            libArchive }
     };
-    enum { Count = sizeof(types) / sizeof(DataPlugin) };
+    enum { Count = sizeof(types) / sizeof(Plugin) };
 
-    static const DataPlugin *res[Count + 1] = {};
+    static const Plugin *res[Count + 1] = {};
 
     for (unsigned i = 0; i < Count; ++i)
         res[i] = &types[i];
@@ -71,7 +71,7 @@ const Package::DataPlugin **Package::dataPlugins() const
     return res;
 }
 
-const Package::RootPlugin **Package::rootPlugins() const
+const Package::Plugin **Package::protocolPlugins() const
 {
     return NULL;
 }

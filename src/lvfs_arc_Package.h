@@ -37,8 +37,8 @@ public:
     virtual ~Package();
 
     virtual const char *name() const;
-    virtual const DataPlugin **dataPlugins() const;
-    virtual const RootPlugin **rootPlugins() const;
+    virtual const Plugin **contentPlugins() const;
+    virtual const Plugin **protocolPlugins() const;
 };
 
 }}
