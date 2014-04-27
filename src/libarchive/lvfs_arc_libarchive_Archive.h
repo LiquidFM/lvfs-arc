@@ -21,6 +21,7 @@
 #define LVFS_ARC_LIBARCHIVE_ARCHIVE_H_
 
 #include <cstdio>
+#include <lvfs/IType>
 #include <lvfs/IFile>
 #include <lvfs/IFsFile>
 #include <lvfs/IDirectory>
@@ -60,9 +61,9 @@ public:
 
     /* IEntry */
 
-    virtual const char *type() const;
     virtual const char *title() const;
     virtual const char *location() const;
+    virtual const IType *type() const;
 
     /* IFsFile */
 

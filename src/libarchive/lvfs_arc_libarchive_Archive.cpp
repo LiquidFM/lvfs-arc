@@ -19,6 +19,7 @@
 
 #include "lvfs_arc_libarchive_Archive.h"
 
+#include <lvfs/Singleton>
 #include <brolly/assert.h>
 
 #include <cstdlib>
@@ -220,9 +221,13 @@ public:
         m_mTime(archive_entry_mtime(entry)),
         m_aTime(archive_entry_atime(entry)),
         m_perm(archive_entry_perm(entry)),
-        m_size(archive_entry_size(entry))
+        m_size(archive_entry_size(entry)),
+        m_type(NULL)
     {
         ASSERT(reader.isValid());
+        m_typeHolder = Singleton::desktop().typeOfFile(this, m_path);
+        ASSERT(m_typeHolder.isValid());
+        m_type = m_typeHolder->as<IType>();
     }
 
     virtual ~ArchiveEntry()
@@ -261,9 +266,9 @@ public:
     virtual size_t position() const { m_error = Error(ENOENT); return 0; }
     virtual const Error &lastError() const { return m_error; }
 
-    virtual const char *type() const { return NULL; }
     virtual const char *title() const { return m_path; }
     virtual const char *location() const { return m_path; }
+    virtual const IType *type() const { return m_type; }
 
     virtual time_t cTime() const { return m_cTime; }
     virtual time_t mTime() const { return m_mTime; }
@@ -282,6 +287,9 @@ private:
     time_t m_aTime;
     int m_perm;
     uint64_t m_size;
+
+    const IType *m_type;
+    Interface::Holder m_typeHolder;
 };
 
 
@@ -476,13 +484,6 @@ bool Archive::remove(const Interface::Holder &file)
     return false;
 }
 
-const char *Archive::type() const
-{
-    Interface::Adaptor<IEntry> file(m_file);
-    ASSERT(file.isValid());
-    return file->type();
-}
-
 const char *Archive::title() const
 {
     Interface::Adaptor<IEntry> file(m_file);
@@ -495,6 +496,13 @@ const char *Archive::location() const
     Interface::Adaptor<IEntry> file(m_file);
     ASSERT(file.isValid());
     return file->location();
+}
+
+const IType *Archive::type() const
+{
+    Interface::Adaptor<IEntry> file(m_file);
+    ASSERT(file.isValid());
+    return file->type();
 }
 
 time_t Archive::cTime() const
