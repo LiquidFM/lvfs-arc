@@ -17,22 +17,22 @@
  * along with lvfs-arc. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lvfs_arc_libarchive_Archive.h"
+#include "lvfs_arc_libunrar_Archive.h"
 
 #include <lvfs/Singleton>
 #include <brolly/assert.h>
 
-#include <cstdlib>
-#include <cstring>
-#include <archive.h>
-#include <archive_entry.h>
+#include <wchar.h>
+#include <libunrar/rar.hpp>
+#include <libunrar/dll.hpp>
+#include <libunrar/timefn.hpp>
 
-#include <errno.h>
+#include <cstdio>
 
 
 namespace LVFS {
 namespace Arc {
-namespace LibArchive {
+namespace LibUnrar {
 namespace {
 
 
@@ -49,16 +49,23 @@ namespace {
         ArchiveReader(const Interface::Holder &file, const char *password) :
             m_count(0),
             m_archive(NULL),
-            m_entry(NULL),
+            m_password(password ? strdup(password) : NULL),
             m_fileHolder(file),
             m_file(m_fileHolder),
-            m_password(password ? strdup(password) : NULL)
-        {}
+            m_tmpFile(NULL)
+        {
+            memset(&m_archiveData, 0, sizeof(m_archiveData));
+            memset(&m_archiveInfo, 0, sizeof(m_archiveInfo));
+
+            Interface::Adaptor<IEntry> entry(m_fileHolder);
+            m_archiveData.ArcName = const_cast<char *>(entry->location());
+            m_archiveData.OpenMode = RAR_OM_EXTRACT;
+            m_archiveData.Callback = unrarcallback;
+            m_archiveData.UserData = reinterpret_cast<LPARAM>(this);
+        }
 
         virtual ~ArchiveReader()
         {
-            archive_read_free(m_archive);
-
             if (m_password)
                 free(m_password);
         }
@@ -82,20 +89,15 @@ namespace {
                 return true;
             }
 
-            m_archive = archive_read_new();
-
-            if (LIKELY(m_archive != NULL))
+            if (m_archive = RAROpenArchiveEx(&m_archiveData))
             {
-                archive_read_support_filter_all(m_archive);
-                archive_read_support_format_all(m_archive);
+                RARSetCallback(m_archive, unrarcallback, reinterpret_cast<LPARAM>(this));
 
-                if (LIKELY(archive_read_open2(m_archive, this, open, read, skip, close) == ARCHIVE_OK))
-                {
-                    m_count = 1;
-                    return true;
-                }
-                else
-                    close();
+                if (m_password)
+                    RARSetPassword(m_archive, m_password);
+
+                m_count = 1;
+                return true;
             }
 
             return false;
@@ -103,7 +105,18 @@ namespace {
 
         virtual size_t read(void *buffer, size_t size)
         {
-            return archive_read_data(m_archive, buffer, size);
+            int res = 0;
+
+            if (m_tmpFile)
+                return fread(buffer, 1, size, m_tmpFile);
+            else
+                if ((m_tmpFile = tmpfile()) && (res = RARProcessFile(m_archive, RAR_EXTRACT, NULL, NULL)) == 0)
+                {
+                    fseek(m_tmpFile, 0, SEEK_SET);
+                    return fread(buffer, 1, size, m_tmpFile);
+                }
+
+            return 0;
         }
 
         virtual size_t write(const void *buffer, size_t size)
@@ -125,9 +138,15 @@ namespace {
         {
             if (--m_count == 0)
             {
-                archive_read_free(m_archive);
+                if (m_tmpFile)
+                    fclose(m_tmpFile);
+
+                RARCloseArchive(m_archive);
+
                 m_archive = NULL;
-                m_entry = NULL;
+                m_tmpFile = NULL;
+
+                memset(&m_archiveInfo, 0, sizeof(m_archiveInfo));
             }
         }
 
@@ -148,99 +167,97 @@ namespace {
 
         inline bool find(const char *path)
         {
-            if (m_entry != NULL)
+            if (m_archiveInfo.FileName[0] != 0)
             {
-                ASSERT(strcmp(path, archive_entry_pathname(m_entry)) == 0);
+                ASSERT(strcmp(path, m_archiveInfo.FileName) == 0);
                 return true;
             }
             else
-                while (archive_read_next_header(m_archive, &m_entry) == ARCHIVE_OK)
-                    if (strcmp(path, archive_entry_pathname(m_entry)) == 0)
+                while (RARReadHeaderEx(m_archive, &m_archiveInfo) == 0)
+                    if (strcmp(path, m_archiveInfo.FileName) == 0)
                         return true;
+                    else
+                        RARProcessFile(m_archive, RAR_SKIP, NULL, NULL);
 
             return false;
         }
 
-        inline struct archive_entry *next()
+        inline struct RARHeaderDataEx *next()
         {
-            while (archive_read_next_header(m_archive, &m_entry) == ARCHIVE_OK)
-                if (archive_entry_pathname(m_entry)[strlen(archive_entry_pathname(m_entry)) - 1] != '/')
-                    return m_entry;
+            if (m_archiveInfo.FileName[0] != 0)
+                if (m_tmpFile)
+                {
+                    fclose(m_tmpFile);
+                    m_tmpFile = NULL;
+                }
+                else
+                    RARProcessFile(m_archive, RAR_SKIP, NULL, NULL);
+
+            if (RARReadHeaderEx(m_archive, &m_archiveInfo) == 0)
+                return &m_archiveInfo;
 
             return NULL;
         }
 
     private:
-        static int open(struct archive *archive, void *_client_data)
+        static int CALLBACK unrarcallback(UINT msg, LPARAM userData, LPARAM p1, LPARAM p2)
         {
-            static int archive_res[2] = { ARCHIVE_FAILED, ARCHIVE_OK };
-            return archive_res[static_cast<ArchiveReader *>(_client_data)->m_file->open()];
-        }
+            ArchiveReader *self = reinterpret_cast<ArchiveReader *>(userData);
 
-        static ssize_t read(struct archive *archive, void *_client_data, const void **_buffer)
-        {
-            ArchiveReader *self = static_cast<ArchiveReader *>(_client_data);
-            (*_buffer) = self->m_buffer;
-            return self->m_file->read(self->m_buffer, BlockSize);
-        }
+            switch (msg)
+            {
+                case UCM_PROCESSDATA:
+                {
+                    if (fwrite(reinterpret_cast<void *>(p1), 1, p2, self->m_tmpFile) != (size_t)p2)
+                        return -1;
 
-        static int64_t skip(struct archive *archive, void *_client_data, int64_t request)
-        {
-            ArchiveReader *self = static_cast<ArchiveReader *>(_client_data);
-            int64_t res = self->m_file->position();
+                    break;
+                }
 
-            if (self->m_file->seek(request, IFile::FromCurrent))
-                return self->m_file->position() - res;
-            else
-                return 0;
-        }
+                default:
+                    break;
+            }
 
-        static int close(struct archive *archive, void *_client_data)
-        {
-            static_cast<ArchiveReader *>(_client_data)->m_file->close();
-            return ARCHIVE_OK;
+            return ERAR_SUCCESS;
         }
 
     private:
         int m_count;
-        struct archive *m_archive;
-        struct archive_entry *m_entry;
+        void *m_archive;
+        char *m_password;
         Interface::Holder m_fileHolder;
         Interface::Adaptor<IFile> m_file;
-        char *m_password;
-        char m_buffer[BlockSize];
+        struct RAROpenArchiveDataEx m_archiveData;
+        struct RARHeaderDataEx m_archiveInfo;
+
+        FILE *m_tmpFile;
     };
 
 
     class ArchiveEntry : public Implements<IFile, IEntry, IFsFile>
     {
     public:
-        ArchiveEntry(const ArchiveReader::Holder &reader, struct archive_entry *entry) :
+        ArchiveEntry(const ArchiveReader::Holder &reader, struct RARHeaderDataEx *entry) :
             m_reader(reader),
-            m_path(strdup(archive_entry_pathname(entry))),
-            m_cTime(archive_entry_birthtime(entry)),
-            m_mTime(archive_entry_mtime(entry)),
-            m_aTime(archive_entry_atime(entry)),
-            m_perm(archive_entry_perm(entry)),
-            m_size(archive_entry_size(entry)),
+            m_entry(*entry),
             m_type(NULL)
         {
             ASSERT(reader.isValid());
-            m_typeHolder = Singleton::desktop().typeOfFile(this, m_path);
+            m_typeHolder = Singleton::desktop().typeOfFile(this, m_entry.FileName);
             ASSERT(m_typeHolder.isValid());
             m_type = m_typeHolder->as<IType>();
         }
 
         virtual ~ArchiveEntry()
         {
-            free(m_path);
+    //        free(m_path);
         }
 
         virtual bool open()
         {
             if (m_reader->open())
             {
-                if (m_reader->find(m_path))
+                if (m_reader->find(m_entry.FileName))
                     return true;
 
                 m_reader->close();
@@ -263,31 +280,25 @@ namespace {
             m_reader->close();
         }
 
-        virtual uint64_t size() const { return m_size; }
+        virtual uint64_t size() const { return PLATFORM_MAKE_QWORD(m_entry.UnpSizeHigh, m_entry.UnpSize); }
         virtual size_t position() const { m_error = Error(ENOENT); return 0; }
         virtual const Error &lastError() const { return m_error; }
 
-        virtual const char *title() const { return m_path; }
-        virtual const char *location() const { return m_path; }
+        virtual const char *title() const { return m_entry.FileName; }
+        virtual const char *location() const { return m_entry.FileName; }
         virtual const IType *type() const { return m_type; }
 
-        virtual time_t cTime() const { return m_cTime; }
-        virtual time_t mTime() const { return m_mTime; }
-        virtual time_t aTime() const { return m_aTime; }
+        virtual time_t cTime() const { return 0; }
+        virtual time_t mTime() const { return 0; }
+        virtual time_t aTime() const { return 0; }
 
-        virtual int permissions() const { return m_perm; }
+        virtual int permissions() const { return 0; }
         virtual bool setPermissions(int value) { m_error = Error(ENOENT); return false; }
 
     private:
         mutable Error m_error;
         ArchiveReader::Holder m_reader;
-
-        char *m_path;
-        time_t m_cTime;
-        time_t m_mTime;
-        time_t m_aTime;
-        int m_perm;
-        uint64_t m_size;
+        struct RARHeaderDataEx m_entry;
 
         const IType *m_type;
         Interface::Holder m_typeHolder;
@@ -346,7 +357,7 @@ namespace {
             {
                 m_res.reset();
 
-                if (struct archive_entry *e = m_reader->next())
+                if (struct RARHeaderDataEx *e = m_reader->next())
                 {
                     m_res.reset(new (std::nothrow) ArchiveEntry(m_reader, e));
                     return;

@@ -19,6 +19,7 @@
 
 #include "lvfs_arc_Package.h"
 #include "lvfs_arc_LibArchive.h"
+#include "lvfs_arc_LibUnrar.h"
 
 
 namespace LVFS {
@@ -38,6 +39,7 @@ const char *Package::name() const
 const Package::Plugin **Package::contentPlugins() const
 {
     static const LibArchive::Plugin libArchive;
+    static const LibUnrar::Plugin libUnrar;
 
     static const Plugin types[] =
     {
@@ -59,7 +61,8 @@ const Package::Plugin **Package::contentPlugins() const
         { "application/x-servicepack",         libArchive },
         { "application/x-xz-compressed-tar",   libArchive },
         { "application/x-lzma-compressed-tar", libArchive },
-        { "application/x-cd-image",            libArchive }
+        { "application/x-cd-image",            libArchive },
+        { "application/x-rar",                 libUnrar }
     };
     enum { Count = sizeof(types) / sizeof(Plugin) };
 
