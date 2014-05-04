@@ -7,14 +7,11 @@ project_cxx_library_header_default ()
 list (APPEND ${PROJECT_NAME}_LIBS brolly)
 list (APPEND ${PROJECT_NAME}_LIBS efc)
 list (APPEND ${PROJECT_NAME}_LIBS lvfs)
+list (APPEND ${PROJECT_NAME}_LIBS unrar)
 
 find_package (LibArchive REQUIRED)
 include_directories (${LIBARCHIVE_INCLUDE_DIR})
 list (APPEND ${PROJECT_NAME}_LIBS ${LIBARCHIVE_LIBRARY})
-
-find_package (LibUnrar REQUIRED)
-include_directories (${LIBUNRAR_INCLUDE})
-list (APPEND ${PROJECT_NAME}_LIBS ${LIBUNRAR_LIBRARY})
 
 # Sources
 add_subdirectory (src)
@@ -28,3 +25,7 @@ build_version_file (lvfs-arc 0.0.1)
 
 # Documentation
 add_documentation ("LVFS-Arc" 0.0.1 "LVFS Plugin for reading archive files")
+
+# Install rules
+install_header_files (lvfs-arc "src/lvfs_arc_IArchive.h:IArchive")
+install_target (lvfs-arc)

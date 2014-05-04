@@ -110,7 +110,7 @@ namespace {
             if (m_tmpFile)
                 return fread(buffer, 1, size, m_tmpFile);
             else
-                if ((m_tmpFile = tmpfile()) && (res = RARProcessFile(m_archive, RAR_EXTRACT, NULL, NULL)) == 0)
+                if ((m_tmpFile = tmpfile()) && (res = RARProcessFile(m_archive, RAR_EXTRACT, NULL, NULL, true)) == 0)
                 {
                     fseek(m_tmpFile, 0, SEEK_SET);
                     return fread(buffer, 1, size, m_tmpFile);
