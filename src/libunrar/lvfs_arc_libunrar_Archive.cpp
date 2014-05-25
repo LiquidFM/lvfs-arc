@@ -19,7 +19,7 @@
 
 #include "lvfs_arc_libunrar_Archive.h"
 
-#include <lvfs/Singleton>
+#include <lvfs/Module>
 #include <brolly/assert.h>
 
 #include <wchar.h>
@@ -243,7 +243,7 @@ namespace {
             m_type(NULL)
         {
             ASSERT(reader.isValid());
-            m_typeHolder = Singleton::desktop().typeOfFile(this, m_entry.FileName);
+            m_typeHolder = Module::desktop().typeOfFile(this, m_entry.FileName);
             ASSERT(m_typeHolder.isValid());
             m_type = m_typeHolder->as<IType>();
         }

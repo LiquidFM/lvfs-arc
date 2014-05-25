@@ -19,7 +19,7 @@
 
 #include "lvfs_arc_libarchive_Archive.h"
 
-#include <lvfs/Singleton>
+#include <lvfs/Module>
 #include <brolly/assert.h>
 
 #include <cstdlib>
@@ -50,8 +50,7 @@ namespace {
             m_count(0),
             m_archive(NULL),
             m_entry(NULL),
-            m_fileHolder(file),
-            m_file(m_fileHolder),
+            m_file(file),
             m_password(password ? strdup(password) : NULL)
         {}
 
@@ -205,7 +204,6 @@ namespace {
         int m_count;
         struct archive *m_archive;
         struct archive_entry *m_entry;
-        Interface::Holder m_fileHolder;
         Interface::Adaptor<IFile> m_file;
         char *m_password;
         char m_buffer[BlockSize];
@@ -226,7 +224,7 @@ namespace {
             m_type(NULL)
         {
             ASSERT(reader.isValid());
-            m_typeHolder = Singleton::desktop().typeOfFile(this, m_path);
+            m_typeHolder = Module::desktop().typeOfFile(this, m_path);
             ASSERT(m_typeHolder.isValid());
             m_type = m_typeHolder->as<IType>();
         }
