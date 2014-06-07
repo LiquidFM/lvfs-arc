@@ -266,6 +266,7 @@ namespace {
         virtual const Error &lastError() const { return m_error; }
 
         virtual const char *title() const { return m_path; }
+        virtual const char *schema() const { return "file"; }
         virtual const char *location() const { return m_path; }
         virtual const IType *type() const { return m_type; }
 
@@ -484,6 +485,13 @@ const char *Archive::title() const
     Interface::Adaptor<IEntry> file(m_file);
     ASSERT(file.isValid());
     return file->title();
+}
+
+const char *Archive::schema() const
+{
+    Interface::Adaptor<IEntry> file(m_file);
+    ASSERT(file.isValid());
+    return file->schema();
 }
 
 const char *Archive::location() const

@@ -62,6 +62,7 @@ public:
     /* IEntry */
 
     virtual const char *title() const;
+    virtual const char *schema() const;
     virtual const char *location() const;
     virtual const IType *type() const;
 
