@@ -366,7 +366,7 @@ namespace {
 
 
 Archive::Archive(const Interface::Holder &file) :
-    m_file(file),
+    ExtendsBy(file),
     m_password(NULL),
     m_lastError(&m_error)
 {
@@ -379,81 +379,9 @@ Archive::~Archive()
         free(m_password);
 }
 
-bool Archive::open()
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    return file->open();
-}
-
-size_t Archive::read(void *buffer, size_t size)
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    return file->read(buffer, size);
-}
-
-size_t Archive::write(const void *buffer, size_t size)
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    return file->write(buffer, size);
-}
-
-bool Archive::seek(long offset, Whence whence)
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    return file->seek(offset, whence);
-}
-
-bool Archive::flush()
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    return file->flush();
-}
-
-void Archive::close()
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    file->close();
-}
-
-uint64_t Archive::size() const
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    return file->size();
-}
-
-size_t Archive::position() const
-{
-    Interface::Adaptor<IFile> file(m_file);
-    ASSERT(file.isValid());
-    m_lastError = &file->lastError();
-
-    return file->position();
-}
-
 Archive::const_iterator Archive::begin() const
 {
-    return Iterator(m_file, m_password);
+    return Iterator(original(), m_password);
 }
 
 Archive::const_iterator Archive::end() const
@@ -478,69 +406,6 @@ bool Archive::remove(const Interface::Holder &file)
     m_lastError = &m_error;
     m_error = Error(0);
     return false;
-}
-
-const char *Archive::title() const
-{
-    Interface::Adaptor<IEntry> file(m_file);
-    ASSERT(file.isValid());
-    return file->title();
-}
-
-const char *Archive::schema() const
-{
-    Interface::Adaptor<IEntry> file(m_file);
-    ASSERT(file.isValid());
-    return file->schema();
-}
-
-const char *Archive::location() const
-{
-    Interface::Adaptor<IEntry> file(m_file);
-    ASSERT(file.isValid());
-    return file->location();
-}
-
-const IType *Archive::type() const
-{
-    Interface::Adaptor<IEntry> file(m_file);
-    ASSERT(file.isValid());
-    return file->type();
-}
-
-time_t Archive::cTime() const
-{
-    Interface::Adaptor<IFsFile> file(m_file);
-    ASSERT(file.isValid());
-    return file->cTime();
-}
-
-time_t Archive::mTime() const
-{
-    Interface::Adaptor<IFsFile> file(m_file);
-    ASSERT(file.isValid());
-    return file->mTime();
-}
-
-time_t Archive::aTime() const
-{
-    Interface::Adaptor<IFsFile> file(m_file);
-    ASSERT(file.isValid());
-    return file->aTime();
-}
-
-int Archive::permissions() const
-{
-    Interface::Adaptor<IFsFile> file(m_file);
-    ASSERT(file.isValid());
-    return file->permissions();
-}
-
-bool Archive::setPermissions(int value)
-{
-    Interface::Adaptor<IFsFile> file(m_file);
-    ASSERT(file.isValid());
-    return file->setPermissions(value);
 }
 
 const char *Archive::password() const

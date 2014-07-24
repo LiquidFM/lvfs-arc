@@ -32,23 +32,11 @@ namespace LVFS {
 namespace Arc {
 namespace LibArchive {
 
-class PLATFORM_MAKE_PRIVATE Archive : public Implements<IFile, IDirectory, IEntry, IFsFile, IArchive>
+class PLATFORM_MAKE_PRIVATE Archive : public ExtendsBy<IDirectory, IArchive>
 {
 public:
     Archive(const Interface::Holder &file);
     virtual ~Archive();
-
-    /* IFile */
-
-    virtual bool open();
-    virtual size_t read(void *buffer, size_t size);
-    virtual size_t write(const void *buffer, size_t size);
-    virtual bool seek(long offset, Whence whence);
-    virtual bool flush();
-    virtual void close();
-
-    virtual uint64_t size() const;
-    virtual size_t position() const;
 
     /* IDirectory */
 
@@ -58,22 +46,6 @@ public:
 
     virtual bool rename(const Interface::Holder &file, const char *name);
     virtual bool remove(const Interface::Holder &file);
-
-    /* IEntry */
-
-    virtual const char *title() const;
-    virtual const char *schema() const;
-    virtual const char *location() const;
-    virtual const IType *type() const;
-
-    /* IFsFile */
-
-    virtual time_t cTime() const;
-    virtual time_t mTime() const;
-    virtual time_t aTime() const;
-
-    virtual int permissions() const;
-    virtual bool setPermissions(int value);
 
     /* IArchive */
 
@@ -85,7 +57,6 @@ public:
     virtual const Error &lastError() const;
 
 private:
-    Interface::Holder m_file;
     char *m_password;
     mutable Error m_error;
     mutable const Error *m_lastError;
