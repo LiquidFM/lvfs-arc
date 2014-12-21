@@ -17,7 +17,7 @@ list (APPEND ${PROJECT_NAME}_LIBS ${LIBARCHIVE_LIBRARY})
 add_subdirectory (src)
 
 # Target - lvfs-arc
-add_library(lvfs-arc SHARED ${${PROJECT_NAME}_SOURCES})
+add_library (lvfs-arc SHARED ${${PROJECT_NAME}_SOURCES})
 target_link_libraries (lvfs-arc ${${PROJECT_NAME}_LIBS})
 
 # Version
