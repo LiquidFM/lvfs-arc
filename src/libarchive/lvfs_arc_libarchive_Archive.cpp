@@ -110,6 +110,11 @@ namespace {
             return 0;
         }
 
+        virtual bool advise(off_t offset, off_t len, Advise advise)
+        {
+            return false;
+        }
+
         virtual bool seek(long offset, Whence whence)
         {
             return false;
@@ -253,6 +258,7 @@ namespace {
         }
 
         virtual size_t write(const void *buffer, size_t size) { m_error = Error(ENOENT); return false; }
+        virtual bool advise(off_t offset, off_t len, Advise advise) { return false; }
         virtual bool seek(long offset, Whence whence) { m_error = Error(ENOENT); return false; }
         virtual bool flush() { m_error = Error(ENOENT); return false; }
 
