@@ -20,10 +20,6 @@
 #ifndef LVFS_ARC_LIBARCHIVE_ARCHIVE_H_
 #define LVFS_ARC_LIBARCHIVE_ARCHIVE_H_
 
-#include <cstdio>
-#include <lvfs/IType>
-#include <lvfs/IFile>
-#include <lvfs/IFsFile>
 #include <lvfs/IDirectory>
 #include <lvfs-arc/IArchive>
 
@@ -42,8 +38,11 @@ public:
 
     virtual const_iterator begin() const;
     virtual const_iterator end() const;
-    virtual Interface::Holder entry(const char *name) const;
 
+    virtual bool exists(const char *name) const;
+    virtual Interface::Holder entry(const char *name, const IType *type = NULL, bool create = false);
+
+    virtual bool copy(const Progress &callback, const Interface::Holder &file, bool move = false);
     virtual bool rename(const Interface::Holder &file, const char *name);
     virtual bool remove(const Interface::Holder &file);
 
