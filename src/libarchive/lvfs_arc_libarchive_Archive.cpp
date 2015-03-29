@@ -192,14 +192,18 @@ namespace {
             m_type(NULL)
         {
             ASSERT(reader.isValid());
-            m_typeHolder = Module::desktop().typeOfFile(this);
-            ASSERT(m_typeHolder.isValid());
-            m_type = m_typeHolder->as<IType>();
         }
 
         virtual ~ArchiveEntry()
         {
             free(m_path);
+        }
+
+        void initType()
+        {
+            m_typeHolder = Module::desktop().typeOfFile(this);
+            ASSERT(m_typeHolder.isValid());
+            m_type = m_typeHolder->as<IType>();
         }
 
         virtual const char *title() const { return m_path; }
@@ -299,12 +303,16 @@ namespace {
                 if (struct archive_entry *e = m_reader->next())
                 {
                     m_res.reset(new (std::nothrow) ArchiveEntry(m_reader, e));
-                    return;
+
+                    if (LIKELY(m_res.isValid() == true))
+                    {
+                        m_res.as<ArchiveEntry>()->initType();
+                        return;
+                    }
                 }
 
                 m_reader.reset();
             }
-
 
         private:
             ArchiveReader::Holder m_reader;
