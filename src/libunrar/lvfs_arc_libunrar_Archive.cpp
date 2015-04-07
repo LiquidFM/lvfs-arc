@@ -313,6 +313,11 @@ namespace {
                     if (LIKELY(m_res.isValid() == true))
                     {
                         m_res.as<ArchiveEntry>()->initType();
+
+                        Interface::Holder modded = Module::open(m_res);
+                        if (modded.isValid())
+                            m_res = modded;
+
                         return;
                     }
                 }
