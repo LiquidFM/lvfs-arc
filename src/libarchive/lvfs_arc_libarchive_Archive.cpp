@@ -48,7 +48,6 @@ namespace {
 
     public:
         ArchiveReader(const Interface::Holder &file, const char *password) :
-            m_count(0),
             m_holder(file),
             m_file(),
             m_password(password ? strdup(password) : NULL),
@@ -56,21 +55,38 @@ namespace {
             m_entry(NULL)
         {}
 
+        ArchiveReader(const ArchiveReader::Holder &other) :
+            m_holder(other->m_holder),
+            m_file(),
+            m_password(other->m_password ? strdup(other->m_password) : NULL),
+            m_archive(NULL),
+            m_entry(NULL)
+        {}
+
         ~ArchiveReader()
         {
-            archive_read_free(m_archive);
+            close();
 
             if (m_password)
                 free(m_password);
         }
 
-        inline const char *password() const { return m_password; }
+        inline const char *password() const
+        {
+            return m_password;
+        }
+
         inline void setPassword(const char *value)
         {
             if (m_password)
                 free(m_password);
 
             m_password = strdup(value);
+        }
+
+        inline bool isOpen() const
+        {
+            return m_archive != NULL;
         }
 
         inline bool open()
@@ -84,10 +100,7 @@ namespace {
                 archive_read_support_format_all(m_archive);
 
                 if (LIKELY(archive_read_open2(m_archive, this, open, read, skip, close) == ARCHIVE_OK))
-                {
-                    m_count = 1;
                     return true;
-                }
                 else
                     close();
             }
@@ -107,33 +120,28 @@ namespace {
 
         inline void close()
         {
-            archive_read_free(m_archive);
-            m_archive = NULL;
-            m_entry = NULL;
-        }
-
-        inline bool find(const char *path) const
-        {
-            if (m_entry != NULL)
+            if (isOpen())
             {
-                ASSERT(strcmp(path, archive_entry_pathname(m_entry)) == 0);
-                return true;
+                archive_read_free(m_archive);
+                m_archive = NULL;
+                m_entry = NULL;
+                m_file.reset();
             }
-            else
-                while (archive_read_next_header(m_archive, &m_entry) == ARCHIVE_OK)
-                    if (strcmp(path, archive_entry_pathname(m_entry)) == 0)
-                        return true;
-
-            return false;
         }
 
         inline struct archive_entry *next()
         {
             while (archive_read_next_header(m_archive, &m_entry) == ARCHIVE_OK)
-                if (archive_entry_pathname(m_entry)[strlen(archive_entry_pathname(m_entry)) - 1] != '/')
+                if (::archive_entry_pathname(m_entry)[strlen(::archive_entry_pathname(m_entry)) - 1] != '/')
                     return m_entry;
 
             return NULL;
+        }
+
+        const char *archive_entry_pathname() const
+        {
+            ASSERT(m_entry != NULL);
+            return ::archive_entry_pathname(m_entry);
         }
 
     private:
@@ -161,6 +169,16 @@ namespace {
                 return 0;
         }
 
+        static int64_t seek(struct archive *archive, void *_client_data, int64_t offset, int whence)
+        {
+            ArchiveReader *self = static_cast<ArchiveReader *>(_client_data);
+
+            if (self->m_file->seek(offset, static_cast<IFile::Whence>(whence)))
+                return offset;
+            else
+                return ARCHIVE_FATAL;
+        }
+
         static int close(struct archive *archive, void *_client_data)
         {
             static_cast<ArchiveReader *>(_client_data)->m_file.reset();
@@ -168,7 +186,6 @@ namespace {
         }
 
     private:
-        int m_count;
         Interface::Holder m_holder;
         Interface::Adaptor<IFile> m_file;
         char *m_password;
@@ -178,7 +195,31 @@ namespace {
     };
 
 
-    class ArchiveEntry : public Implements<IEntry, IFile, IProperties>
+    class ArchiveEntryFile : public Implements<IFile>
+    {
+    public:
+        ArchiveEntryFile(const ArchiveReader::Holder &reader) :
+            m_reader(reader)
+        {
+            ASSERT(m_reader.isValid());
+        }
+
+    public: /* IFile */
+        virtual size_t read(void *buffer, size_t size) { return m_reader->read(buffer, size); }
+        virtual size_t write(const void *buffer, size_t size) { m_error = Error(EROFS); return false; }
+        virtual bool advise(off_t offset, off_t len, Advise advise) { m_error = Error(EROFS); return false; }
+        virtual bool seek(long offset, Whence whence) { m_error = Error(EROFS); return false; }
+        virtual bool flush() { m_error = Error(EROFS); return false; }
+
+        virtual const Error &lastError() const { return m_error; }
+
+    private:
+        mutable Error m_error;
+        ArchiveReader::Holder m_reader;
+    };
+
+
+    class ArchiveEntry : public Implements<IEntry, IProperties>
     {
     public:
         ArchiveEntry(const ArchiveReader::Holder &reader, struct archive_entry *entry) :
@@ -191,7 +232,7 @@ namespace {
             m_size(archive_entry_size(entry)),
             m_type(NULL)
         {
-            ASSERT(reader.isValid());
+            ASSERT(m_reader.isValid());
         }
 
         virtual ~ArchiveEntry()
@@ -206,35 +247,38 @@ namespace {
             m_type = m_typeHolder->as<IType>();
         }
 
+    public: /* IEntry */
         virtual const char *title() const { return m_path; }
         virtual const char *schema() const { return "file"; }
         virtual const char *location() const { return m_path; }
         virtual const IType *type() const { return m_type; }
         virtual Interface::Holder open(IFile::Mode mode) const
         {
-            if (mode == IFile::Read && m_reader->find(m_path))
-                return Interface::Holder::fromRawData(const_cast<ArchiveEntry *>(this));
-            else
-                return Interface::Holder();
+            if (mode == IFile::Read)
+                if (m_reader->isOpen() && ::strcmp(m_path, m_reader->archive_entry_pathname()) == 0)
+                    return Interface::Holder(new (std::nothrow) ArchiveEntryFile(m_reader));
+                else
+                {
+                    ArchiveReader::Holder reader(new (std::nothrow) ArchiveReader(m_reader));
+
+                    if (reader.isValid() && reader->open())
+                        while (reader->next())
+                            if (::strcmp(m_path, reader->archive_entry_pathname()) == 0)
+                                return Interface::Holder(new (std::nothrow) ArchiveEntryFile(m_reader = reader));
+                }
+
+            return Interface::Holder();
         }
 
-        virtual size_t read(void *buffer, size_t size) { return m_reader->read(buffer, size); }
-        virtual size_t write(const void *buffer, size_t size) { m_error = Error(ENOENT); return false; }
-        virtual bool advise(off_t offset, off_t len, Advise advise) { return false; }
-        virtual bool seek(long offset, Whence whence) { m_error = Error(ENOENT); return false; }
-        virtual bool flush() { m_error = Error(ENOENT); return false; }
-
+    public: /* IProperties */
         virtual off64_t size() const { return m_size; }
         virtual time_t cTime() const { return m_cTime; }
         virtual time_t mTime() const { return m_mTime; }
         virtual time_t aTime() const { return m_aTime; }
         virtual int permissions() const { return m_perm; }
 
-        virtual const Error &lastError() const { return m_error; }
-
     private:
-        mutable Error m_error;
-        ArchiveReader::Holder m_reader;
+        mutable ArchiveReader::Holder m_reader;
 
         char *m_path;
         time_t m_cTime;
@@ -308,14 +352,15 @@ namespace {
                     {
                         m_res.as<ArchiveEntry>()->initType();
 
-                        Interface::Holder modded = Module::open(m_res);
-                        if (modded.isValid())
-                            m_res = modded;
+                        Interface::Holder res = Module::open(m_res);
+                        if (res.isValid())
+                            m_res = res;
 
                         return;
                     }
                 }
 
+                m_reader->close();
                 m_reader.reset();
             }
 
