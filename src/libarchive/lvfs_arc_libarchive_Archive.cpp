@@ -19,77 +19,42 @@
 
 #include "lvfs_arc_libarchive_Archive.h"
 
-#include <lvfs/Module>
-#include <lvfs/IProperties>
 #include <brolly/assert.h>
 
-#include <cstdlib>
-#include <cstring>
 #include <archive.h>
 #include <archive_entry.h>
 
-#include <errno.h>
+#include <cstring>
 
 
 namespace LVFS {
 namespace Arc {
 namespace LibArchive {
+
 namespace {
-
-
-    class ArchiveReader;
-    typedef ::EFC::Holder<ArchiveReader> ArchiveReaderHolder;
-
-    class ArchiveReader : public ArchiveReaderHolder::Data
+    class ArchiveReader : public Archive::Reader
     {
     public:
         enum { BlockSize = 65536 };
-        typedef ArchiveReaderHolder Holder;
 
     public:
         ArchiveReader(const Interface::Holder &file, const char *password) :
-            m_holder(file),
-            m_file(),
-            m_password(password ? strdup(password) : NULL),
+            Reader(file, password),
             m_archive(NULL),
             m_entry(NULL)
         {}
 
-        ArchiveReader(const ArchiveReader::Holder &other) :
-            m_holder(other->m_holder),
-            m_file(),
-            m_password(other->m_password ? strdup(other->m_password) : NULL),
-            m_archive(NULL),
-            m_entry(NULL)
-        {}
-
-        ~ArchiveReader()
+        virtual ~ArchiveReader()
         {
             close();
-
-            if (m_password)
-                free(m_password);
         }
 
-        inline const char *password() const
-        {
-            return m_password;
-        }
-
-        inline void setPassword(const char *value)
-        {
-            if (m_password)
-                free(m_password);
-
-            m_password = strdup(value);
-        }
-
-        inline bool isOpen() const
+        virtual bool isOpen() const
         {
             return m_archive != NULL;
         }
 
-        inline bool open()
+        virtual bool open()
         {
             ASSERT(m_archive == NULL);
             m_archive = archive_read_new();
@@ -108,40 +73,62 @@ namespace {
             return false;
         }
 
-        inline size_t read(void *buffer, size_t size)
+        virtual size_t read(void *buffer, size_t size)
         {
             return archive_read_data(m_archive, buffer, size);
         }
 
-        inline size_t write(const void *buffer, size_t size)
+        virtual void close()
         {
-            return 0;
+            archive_read_free(m_archive);
+            m_archive = NULL;
+            m_entry = NULL;
+            m_file.reset();
         }
 
-        inline void close()
-        {
-            if (isOpen())
-            {
-                archive_read_free(m_archive);
-                m_archive = NULL;
-                m_entry = NULL;
-                m_file.reset();
-            }
-        }
-
-        inline struct archive_entry *next()
+        virtual bool next()
         {
             while (archive_read_next_header(m_archive, &m_entry) == ARCHIVE_OK)
                 if (::archive_entry_pathname(m_entry)[strlen(::archive_entry_pathname(m_entry)) - 1] != '/')
-                    return m_entry;
+                    return true;
 
-            return NULL;
+            return false;
         }
 
-        const char *archive_entry_pathname() const
+        virtual const char *archive_entry_pathname() const
         {
             ASSERT(m_entry != NULL);
             return ::archive_entry_pathname(m_entry);
+        }
+
+        virtual time_t archive_entry_ctime() const
+        {
+            ASSERT(m_entry != NULL);
+            return ::archive_entry_birthtime(m_entry);
+        }
+
+        virtual time_t archive_entry_mtime() const
+        {
+            ASSERT(m_entry != NULL);
+            return ::archive_entry_mtime(m_entry);
+        }
+
+        virtual time_t archive_entry_atime() const
+        {
+            ASSERT(m_entry != NULL);
+            return ::archive_entry_atime(m_entry);
+        }
+
+        virtual mode_t archive_entry_perm() const
+        {
+            ASSERT(m_entry != NULL);
+            return ::archive_entry_perm(m_entry);
+        }
+
+        virtual int64_t archive_entry_size() const
+        {
+            ASSERT(m_entry != NULL);
+            return ::archive_entry_size(m_entry);
         }
 
     private:
@@ -149,7 +136,7 @@ namespace {
         {
             static int archive_res[2] = { ARCHIVE_FAILED, ARCHIVE_OK };
             ArchiveReader *self = static_cast<ArchiveReader *>(_client_data);
-            return archive_res[(self->m_file = self->m_holder->as<IEntry>()->open()).isValid()];
+            return archive_res[(self->m_file = self->file()->as<IEntry>()->open()).isValid()];
         }
 
         static ssize_t read(struct archive *archive, void *_client_data, const void **_buffer)
@@ -186,262 +173,26 @@ namespace {
         }
 
     private:
-        Interface::Holder m_holder;
         Interface::Adaptor<IFile> m_file;
-        char *m_password;
         mutable struct archive *m_archive;
         mutable struct archive_entry *m_entry;
         char m_buffer[BlockSize];
     };
-
-
-    class ArchiveEntryFile : public Implements<IFile>
-    {
-    public:
-        ArchiveEntryFile(const ArchiveReader::Holder &reader) :
-            m_reader(reader)
-        {
-            ASSERT(m_reader.isValid());
-        }
-
-    public: /* IFile */
-        virtual size_t read(void *buffer, size_t size) { return m_reader->read(buffer, size); }
-        virtual size_t write(const void *buffer, size_t size) { m_error = Error(EROFS); return false; }
-        virtual bool advise(off_t offset, off_t len, Advise advise) { m_error = Error(EROFS); return false; }
-        virtual bool seek(long offset, Whence whence) { m_error = Error(EROFS); return false; }
-        virtual bool flush() { m_error = Error(EROFS); return false; }
-
-        virtual const Error &lastError() const { return m_error; }
-
-    private:
-        mutable Error m_error;
-        ArchiveReader::Holder m_reader;
-    };
-
-
-    class ArchiveEntry : public Implements<IEntry, IProperties>
-    {
-    public:
-        ArchiveEntry(const ArchiveReader::Holder &reader, struct archive_entry *entry) :
-            m_reader(reader),
-            m_path(strdup(archive_entry_pathname(entry))),
-            m_cTime(archive_entry_birthtime(entry)),
-            m_mTime(archive_entry_mtime(entry)),
-            m_aTime(archive_entry_atime(entry)),
-            m_perm(archive_entry_perm(entry)),
-            m_size(archive_entry_size(entry)),
-            m_type(NULL)
-        {
-            ASSERT(m_reader.isValid());
-        }
-
-        virtual ~ArchiveEntry()
-        {
-            free(m_path);
-        }
-
-        void initType()
-        {
-            m_typeHolder = Module::desktop().typeOfFile(this);
-            ASSERT(m_typeHolder.isValid());
-            m_type = m_typeHolder->as<IType>();
-        }
-
-    public: /* IEntry */
-        virtual const char *title() const { return m_path; }
-        virtual const char *schema() const { return "file"; }
-        virtual const char *location() const { return m_path; }
-        virtual const IType *type() const { return m_type; }
-        virtual Interface::Holder open(IFile::Mode mode) const
-        {
-            if (mode == IFile::Read)
-                if (m_reader->isOpen() && ::strcmp(m_path, m_reader->archive_entry_pathname()) == 0)
-                    return Interface::Holder(new (std::nothrow) ArchiveEntryFile(m_reader));
-                else
-                {
-                    ArchiveReader::Holder reader(new (std::nothrow) ArchiveReader(m_reader));
-
-                    if (reader.isValid() && reader->open())
-                        while (reader->next())
-                            if (::strcmp(m_path, reader->archive_entry_pathname()) == 0)
-                                return Interface::Holder(new (std::nothrow) ArchiveEntryFile(m_reader = reader));
-                }
-
-            return Interface::Holder();
-        }
-
-    public: /* IProperties */
-        virtual off64_t size() const { return m_size; }
-        virtual time_t cTime() const { return m_cTime; }
-        virtual time_t mTime() const { return m_mTime; }
-        virtual time_t aTime() const { return m_aTime; }
-        virtual int permissions() const { return m_perm; }
-
-    private:
-        mutable ArchiveReader::Holder m_reader;
-
-        char *m_path;
-        time_t m_cTime;
-        time_t m_mTime;
-        time_t m_aTime;
-        int m_perm;
-        uint64_t m_size;
-
-        const IType *m_type;
-        Interface::Holder m_typeHolder;
-    };
-
-
-    class Iterator : public Archive::const_iterator
-    {
-    public:
-        Iterator() :
-            Archive::const_iterator(new (std::nothrow) Imp())
-        {}
-
-        Iterator(const Interface::Holder &file, const char *password) :
-            Archive::const_iterator(new (std::nothrow) Imp(file, password))
-        {}
-
-    protected:
-        class Imp : public Archive::const_iterator::Implementation
-        {
-            PLATFORM_MAKE_NONCOPYABLE(Imp)
-            PLATFORM_MAKE_NONMOVEABLE(Imp)
-
-        public:
-            Imp()
-            {}
-
-            Imp(const Interface::Holder &file, const char *password) :
-                m_reader(new (std::nothrow) ArchiveReader(file, password))
-            {
-                if (m_reader.isValid() && m_reader->open())
-                    next();
-                else
-                    m_reader.reset();
-            }
-
-            virtual ~Imp()
-            {}
-
-            virtual bool isEqual(const Holder &other) const
-            {
-                return m_reader == other.as<Imp>()->m_reader;
-            }
-
-            virtual reference asReference() const
-            {
-                return m_res;
-            }
-
-            virtual pointer asPointer() const
-            {
-                return &m_res;
-            }
-
-            virtual void next()
-            {
-                m_res.reset();
-
-                if (struct archive_entry *e = m_reader->next())
-                {
-                    m_res.reset(new (std::nothrow) ArchiveEntry(m_reader, e));
-
-                    if (LIKELY(m_res.isValid() == true))
-                    {
-                        m_res.as<ArchiveEntry>()->initType();
-
-                        Interface::Holder res = Module::open(m_res);
-                        if (res.isValid())
-                            m_res = res;
-
-                        return;
-                    }
-                }
-
-                m_reader->close();
-                m_reader.reset();
-            }
-
-        private:
-            ArchiveReader::Holder m_reader;
-            Interface::Holder m_res;
-        };
-    };
-
 }
 
 
 Archive::Archive(const Interface::Holder &file) :
-    ExtendsBy(file),
-    m_password(NULL),
-    m_lastError(&m_error)
-{
-    ASSERT(file.isValid());
-}
+    Arc::Archive(file)
+{}
 
 Archive::~Archive()
-{
-    if (m_password)
-        free(m_password);
-}
+{}
 
 Archive::const_iterator Archive::begin() const
 {
-    return Iterator(original(), m_password);
-}
-
-Archive::const_iterator Archive::end() const
-{
-    return Iterator();
-}
-
-bool Archive::exists(const char *name) const
-{
-    return false;
-}
-
-Interface::Holder Archive::entry(const char *name, const IType *type, bool create)
-{
-    return Interface::Holder();
-}
-
-bool Archive::copy(const Progress &callback, const Interface::Holder &file, bool move)
-{
-    return false;
-}
-
-bool Archive::rename(const Interface::Holder &file, const char *name)
-{
-    m_lastError = &m_error;
-    m_error = Error(0);
-    return false;
-}
-
-bool Archive::remove(const Interface::Holder &file)
-{
-    m_lastError = &m_error;
-    m_error = Error(0);
-    return false;
-}
-
-const char *Archive::password() const
-{
-    return m_password;
-}
-
-void Archive::setPassword(const char *value)
-{
-    if (m_password)
-        free(m_password);
-
-    m_password = strdup(value);
-}
-
-const Error &Archive::lastError() const
-{
-    return *m_lastError;
+    ArchiveReader::Holder reader(new (std::nothrow) ArchiveReader(original(), password()));
+    const_cast<Archive *>(this)->process(reader);
+    return std_iterator<Entries>(entries().begin());
 }
 
 }}}

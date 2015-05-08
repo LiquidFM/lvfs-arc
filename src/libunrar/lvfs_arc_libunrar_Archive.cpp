@@ -19,8 +19,6 @@
 
 #include "lvfs_arc_libunrar_Archive.h"
 
-#include <lvfs/Module>
-#include <lvfs/IProperties>
 #include <brolly/assert.h>
 
 #include <wchar.h>
@@ -28,80 +26,40 @@
 #include <libunrar/dll.hpp>
 #include <libunrar/timefn.hpp>
 
-#include <cstdio>
-
 
 namespace LVFS {
 namespace Arc {
 namespace LibUnrar {
+
 namespace {
-
-
-    class ArchiveReader;
-    typedef ::EFC::Holder<ArchiveReader> ArchiveReaderHolder;
-
-    class ArchiveReader : public ArchiveReaderHolder::Data
+    class ArchiveReader : public Archive::Reader
     {
     public:
-        enum { BlockSize = 65536 };
-        typedef ArchiveReaderHolder Holder;
-
-    public:
         ArchiveReader(const Interface::Holder &file, const char *password) :
-            m_password(password ? strdup(password) : NULL),
-            m_file(),
+            Reader(file, password),
             m_archive(NULL),
-            m_fileHolder(file),
             m_tmpFile(NULL)
         {
-            memset(&m_archiveData, 0, sizeof(m_archiveData));
-            memset(&m_archiveInfo, 0, sizeof(m_archiveInfo));
+            ::memset(&m_archiveData, 0, sizeof(m_archiveData));
+            ::memset(&m_archiveInfo, 0, sizeof(m_archiveInfo));
 
-            m_archiveData.ArcName = const_cast<char *>(m_fileHolder->as<IEntry>()->location());
+            m_archiveData.ArcName = const_cast<char *>(file->as<IEntry>()->location());
             m_archiveData.OpenMode = RAR_OM_EXTRACT;
             m_archiveData.Callback = unrarcallback;
             m_archiveData.UserData = reinterpret_cast<LPARAM>(this);
         }
 
-        ArchiveReader(const ArchiveReader::Holder &other) :
-            m_password(other->m_password ? strdup(other->m_password) : NULL),
-            m_file(),
-            m_archive(NULL),
-            m_fileHolder(other->m_fileHolder),
-            m_tmpFile(NULL)
-        {
-            memset(&m_archiveData, 0, sizeof(m_archiveData));
-            memset(&m_archiveInfo, 0, sizeof(m_archiveInfo));
-
-            m_archiveData.ArcName = const_cast<char *>(m_fileHolder->as<IEntry>()->location());
-            m_archiveData.OpenMode = RAR_OM_EXTRACT;
-            m_archiveData.Callback = unrarcallback;
-            m_archiveData.UserData = reinterpret_cast<LPARAM>(this);
-        }
-
-        ~ArchiveReader()
+        virtual ~ArchiveReader()
         {
             close();
-
-            if (m_password)
-                free(m_password);
         }
 
-        inline const char *password() const { return m_password; }
-        inline void setPassword(const char *value)
-        {
-            if (m_password)
-                free(m_password);
-
-            m_password = strdup(value);
-        }
-
-        inline bool isOpen() const
+        virtual bool isOpen() const
         {
             return m_archive != NULL;
         }
 
-        inline bool open()
+        virtual bool open()
         {
             ASSERT(m_archive == NULL);
 
@@ -109,8 +67,8 @@ namespace {
             {
                 RARSetCallback(m_archive, unrarcallback, reinterpret_cast<LPARAM>(this));
 
-                if (m_password)
-                    RARSetPassword(m_archive, m_password);
+                if (password())
+                    RARSetPassword(m_archive, const_cast<char *>(password()));
 
                 return true;
             }
@@ -118,59 +76,86 @@ namespace {
             return false;
         }
 
-        inline size_t read(void *buffer, size_t size)
+        virtual size_t read(void *buffer, size_t size)
         {
             int res = 0;
 
             if (m_tmpFile)
-                return fread(buffer, 1, size, m_tmpFile);
+                return ::fread(buffer, 1, size, m_tmpFile);
             else
-                if ((m_tmpFile = tmpfile()) && (res = RARProcessFile(m_archive, RAR_EXTRACT, NULL, NULL, true)) == 0)
+                if ((m_tmpFile = ::tmpfile()) && (res = RARProcessFile(m_archive, RAR_EXTRACT, NULL, NULL, true)) == 0)
                 {
-                    fseek(m_tmpFile, 0, SEEK_SET);
-                    return fread(buffer, 1, size, m_tmpFile);
+                    ::fseek(m_tmpFile, 0, SEEK_SET);
+                    return ::fread(buffer, 1, size, m_tmpFile);
                 }
 
             return 0;
         }
 
-        inline void close()
+        virtual void close()
         {
-            if (isOpen())
-            {
-                if (m_tmpFile)
-                    fclose(m_tmpFile);
+            if (m_tmpFile)
+                ::fclose(m_tmpFile);
 
-                RARCloseArchive(m_archive);
+            RARCloseArchive(m_archive);
 
-                m_archive = NULL;
-                m_tmpFile = NULL;
+            m_archive = NULL;
+            m_tmpFile = NULL;
 
-                memset(&m_archiveInfo, 0, sizeof(m_archiveInfo));
-            }
+            ::memset(&m_archiveInfo, 0, sizeof(m_archiveInfo));
         }
 
-        inline struct RARHeaderDataEx *next()
+        virtual bool next()
         {
             if (m_archiveInfo.FileName[0] != 0)
                 if (m_tmpFile)
                 {
-                    fclose(m_tmpFile);
+                    ::fclose(m_tmpFile);
                     m_tmpFile = NULL;
                 }
                 else
                     RARProcessFile(m_archive, RAR_SKIP, NULL, NULL);
 
             if (RARReadHeaderEx(m_archive, &m_archiveInfo) == 0)
-                return &m_archiveInfo;
+                return true;
 
-            return NULL;
+            return false;
         }
 
-        const char *archive_entry_pathname() const
+        virtual const char *archive_entry_pathname() const
         {
             ASSERT(m_archive != NULL);
             return m_archiveInfo.FileName;
+        }
+
+        virtual time_t archive_entry_ctime() const
+        {
+            ASSERT(m_archive != NULL);
+            return 0;
+        }
+
+        virtual time_t archive_entry_mtime() const
+        {
+            ASSERT(m_archive != NULL);
+            return 0;
+        }
+
+        virtual time_t archive_entry_atime() const
+        {
+            ASSERT(m_archive != NULL);
+            return 0;
+        }
+
+        virtual mode_t archive_entry_perm() const
+        {
+            ASSERT(m_archive != NULL);
+            return 0;
+        }
+
+        virtual int64_t archive_entry_size() const
+        {
+            ASSERT(m_archive != NULL);
+            return PLATFORM_MAKE_QWORD(m_archiveInfo.UnpSizeHigh, m_archiveInfo.UnpSize);
         }
 
     private:
@@ -196,8 +181,6 @@ namespace {
         }
 
     private:
-        char *m_password;
-        Interface::Holder m_fileHolder;
         Interface::Adaptor<IFile> m_file;
 
         mutable void *m_archive;
@@ -206,242 +189,21 @@ namespace {
 
         FILE *m_tmpFile;
     };
-
-
-    class ArchiveEntryFile : public Implements<IFile>
-    {
-    public:
-        ArchiveEntryFile(const ArchiveReader::Holder &reader) :
-            m_reader(reader)
-        {
-            ASSERT(m_reader.isValid());
-        }
-
-    public: /* IFile */
-        virtual size_t read(void *buffer, size_t size) { return m_reader->read(buffer, size); }
-        virtual size_t write(const void *buffer, size_t size) { m_error = Error(EROFS); return false; }
-        virtual bool advise(off_t offset, off_t len, Advise advise) { m_error = Error(EROFS); return false; }
-        virtual bool seek(long offset, Whence whence) { m_error = Error(EROFS); return false; }
-        virtual bool flush() { m_error = Error(EROFS); return false; }
-
-        virtual const Error &lastError() const { return m_error; }
-
-    private:
-        mutable Error m_error;
-        ArchiveReader::Holder m_reader;
-    };
-
-
-    class ArchiveEntry : public Implements<IEntry, IProperties>
-    {
-    public:
-        ArchiveEntry(const ArchiveReader::Holder &reader, struct RARHeaderDataEx *entry) :
-            m_reader(reader),
-            m_entry(*entry),
-            m_type(NULL)
-        {
-            ASSERT(reader.isValid());
-        }
-
-        virtual ~ArchiveEntry()
-        {}
-
-        void initType()
-        {
-            m_typeHolder = Module::desktop().typeOfFile(this);
-            ASSERT(m_typeHolder.isValid());
-            m_type = m_typeHolder->as<IType>();
-        }
-
-    public: /* IEntry */
-        virtual const char *title() const { return m_entry.FileName; }
-        virtual const char *schema() const { return "file"; }
-        virtual const char *location() const { return m_entry.FileName; }
-        virtual const IType *type() const { return m_type; }
-        virtual Interface::Holder open(IFile::Mode mode) const
-        {
-            if (mode == IFile::Read)
-                if (m_reader->isOpen() && ::strcmp(m_entry.FileName, m_reader->archive_entry_pathname()) == 0)
-                    return Interface::Holder(new (std::nothrow) ArchiveEntryFile(m_reader));
-                else
-                {
-                    ArchiveReader::Holder reader(new (std::nothrow) ArchiveReader(m_reader));
-
-                    if (reader.isValid() && reader->open())
-                        while (reader->next())
-                            if (::strcmp(m_entry.FileName, reader->archive_entry_pathname()) == 0)
-                                return Interface::Holder(new (std::nothrow) ArchiveEntryFile(m_reader = reader));
-                }
-
-            return Interface::Holder();
-        }
-
-    public: /* IProperties */
-        virtual off64_t size() const { return PLATFORM_MAKE_QWORD(m_entry.UnpSizeHigh, m_entry.UnpSize); }
-        virtual time_t cTime() const { return 0; }
-        virtual time_t mTime() const { return 0; }
-        virtual time_t aTime() const { return 0; }
-        virtual int permissions() const { return 0; }
-
-    private:
-        mutable ArchiveReader::Holder m_reader;
-        struct RARHeaderDataEx m_entry;
-
-        const IType *m_type;
-        Interface::Holder m_typeHolder;
-    };
-
-
-    class Iterator : public Archive::const_iterator
-    {
-    public:
-        Iterator() :
-            Archive::const_iterator(new (std::nothrow) Imp())
-        {}
-
-        Iterator(const Interface::Holder &file, const char *password) :
-            Archive::const_iterator(new (std::nothrow) Imp(file, password))
-        {}
-
-    protected:
-        class Imp : public Archive::const_iterator::Implementation
-        {
-            PLATFORM_MAKE_NONCOPYABLE(Imp)
-            PLATFORM_MAKE_NONMOVEABLE(Imp)
-
-        public:
-            Imp()
-            {}
-
-            Imp(const Interface::Holder &file, const char *password) :
-                m_reader(new (std::nothrow) ArchiveReader(file, password))
-            {
-                if (m_reader.isValid() && m_reader->open())
-                    next();
-                else
-                    m_reader.reset();
-            }
-
-            virtual ~Imp()
-            {}
-
-            virtual bool isEqual(const Holder &other) const
-            {
-                return m_reader == other.as<Imp>()->m_reader;
-            }
-
-            virtual reference asReference() const
-            {
-                return m_res;
-            }
-
-            virtual pointer asPointer() const
-            {
-                return &m_res;
-            }
-
-            virtual void next()
-            {
-                m_res.reset();
-
-                if (struct RARHeaderDataEx *e = m_reader->next())
-                {
-                    m_res.reset(new (std::nothrow) ArchiveEntry(m_reader, e));
-
-                    if (LIKELY(m_res.isValid() == true))
-                    {
-                        m_res.as<ArchiveEntry>()->initType();
-
-                        Interface::Holder res = Module::open(m_res);
-                        if (res.isValid())
-                            m_res = res;
-
-                        return;
-                    }
-                }
-
-                m_reader->close();
-                m_reader.reset();
-            }
-
-        private:
-            ArchiveReader::Holder m_reader;
-            Interface::Holder m_res;
-        };
-    };
-
 }
 
 
 Archive::Archive(const Interface::Holder &file) :
-    ExtendsBy(file),
-    m_password(NULL),
-    m_lastError(&m_error)
-{
-    ASSERT(file.isValid());
-}
+    Arc::Archive(file)
+{}
 
 Archive::~Archive()
-{
-    if (m_password)
-        free(m_password);
-}
+{}
 
 Archive::const_iterator Archive::begin() const
 {
-    return Iterator(original(), m_password);
-}
-
-Archive::const_iterator Archive::end() const
-{
-    return Iterator();
-}
-
-bool Archive::exists(const char *name) const
-{
-    return false;
-}
-
-Interface::Holder Archive::entry(const char *name, const IType *type, bool create)
-{
-    return Interface::Holder();
-}
-
-bool Archive::copy(const Progress &callback, const Interface::Holder &file, bool move)
-{
-    return false;
-}
-
-bool Archive::rename(const Interface::Holder &file, const char *name)
-{
-    m_lastError = &m_error;
-    m_error = Error(0);
-    return false;
-}
-
-bool Archive::remove(const Interface::Holder &file)
-{
-    m_lastError = &m_error;
-    m_error = Error(0);
-    return false;
-}
-
-const char *Archive::password() const
-{
-    return m_password;
-}
-
-void Archive::setPassword(const char *value)
-{
-    if (m_password)
-        free(m_password);
-
-    m_password = strdup(value);
-}
-
-const Error &Archive::lastError() const
-{
-    return *m_lastError;
+    ArchiveReader::Holder reader(new (std::nothrow) ArchiveReader(original(), password()));
+    const_cast<Archive *>(this)->process(reader);
+    return std_iterator<Entries>(entries().begin());
 }
 
 }}}

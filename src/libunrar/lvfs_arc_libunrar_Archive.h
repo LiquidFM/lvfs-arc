@@ -20,45 +20,21 @@
 #ifndef LVFS_ARC_LIBUNRAR_ARCHIVE_H_
 #define LVFS_ARC_LIBUNRAR_ARCHIVE_H_
 
-#include <lvfs/IDirectory>
-#include <lvfs-arc/IArchive>
+#include "../lvfs_arc_Archive.h"
 
 
 namespace LVFS {
 namespace Arc {
 namespace LibUnrar {
 
-class PLATFORM_MAKE_PRIVATE Archive : public ExtendsBy<IDirectory, IArchive>
+class PLATFORM_MAKE_PRIVATE Archive : public Arc::Archive
 {
 public:
     Archive(const Interface::Holder &file);
     virtual ~Archive();
 
-    /* IDirectory */
-
+public: /* IDirectory */
     virtual const_iterator begin() const;
-    virtual const_iterator end() const;
-
-    virtual bool exists(const char *name) const;
-    virtual Interface::Holder entry(const char *name, const IType *type, bool create = false);
-
-    virtual bool copy(const Progress &callback, const Interface::Holder &file, bool move = false);
-    virtual bool rename(const Interface::Holder &file, const char *name);
-    virtual bool remove(const Interface::Holder &file);
-
-    /* IArchive */
-
-    virtual const char *password() const;
-    virtual void setPassword(const char *value);
-
-    /* COMMON */
-
-    virtual const Error &lastError() const;
-
-private:
-    char *m_password;
-    mutable Error m_error;
-    mutable const Error *m_lastError;
 };
 
 }}}
