@@ -150,7 +150,7 @@ namespace {
         {
             ArchiveReader *self = static_cast<ArchiveReader *>(_client_data);
 
-            if (self->m_file->seek(request, IFile::FromCurrent))
+            if (self->m_file->seek(request, IStream::FromCurrent))
                 return request;
             else
                 return 0;
@@ -160,7 +160,7 @@ namespace {
         {
             ArchiveReader *self = static_cast<ArchiveReader *>(_client_data);
 
-            if (self->m_file->seek(offset, static_cast<IFile::Whence>(whence)))
+            if (self->m_file->seek(offset, static_cast<IStream::Whence>(whence)))
                 return offset;
             else
                 return ARCHIVE_FATAL;
@@ -173,7 +173,7 @@ namespace {
         }
 
     private:
-        Interface::Adaptor<IFile> m_file;
+        Interface::Adaptor<IStream> m_file;
         mutable struct archive *m_archive;
         mutable struct archive_entry *m_entry;
         char m_buffer[BlockSize];

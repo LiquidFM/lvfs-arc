@@ -35,7 +35,7 @@ namespace Arc {
 namespace {
 
 
-    class ArchiveEntryFile : public Implements<IFile>
+    class ArchiveEntryFile : public Implements<IStream>
     {
     public:
         ArchiveEntryFile(const Archive::Reader::Holder &reader) :
@@ -44,7 +44,7 @@ namespace {
             ASSERT(m_reader.isValid());
         }
 
-    public: /* IFile */
+    public: /* IStream */
         virtual size_t read(void *buffer, size_t size) { return m_reader->read(buffer, size); }
         virtual size_t write(const void *buffer, size_t size) { m_error = Error(EROFS); return false; }
         virtual bool advise(off_t offset, off_t len, Advise advise) { m_error = Error(EROFS); return false; }
@@ -94,9 +94,9 @@ namespace {
         virtual const char *schema() const { return "file"; }
         virtual const char *location() const { return m_path; }
         virtual const IType *type() const { return m_type; }
-        virtual Interface::Holder open(IFile::Mode mode) const
+        virtual Interface::Holder open(IStream::Mode mode) const
         {
-            if (mode == IFile::Read)
+            if (mode == IStream::Read)
                 if (m_reader->isOpen() && ::strcmp(m_path, m_reader->archive_entry_pathname()) == 0)
                     return Interface::Holder(new (std::nothrow) ArchiveEntryFile(m_reader));
                 else
@@ -153,7 +153,7 @@ namespace {
         virtual const char *schema() const { return "file"; }
         virtual const char *location() const { return m_file->as<IEntry>()->location(); }
         virtual const IType *type() const { return m_type; }
-        virtual Interface::Holder open(IFile::Mode mode = IFile::Read) const
+        virtual Interface::Holder open(IStream::Mode mode = IStream::Read) const
         {
             m_error = Error(EISDIR);
             return Interface::Holder();

@@ -181,7 +181,7 @@ namespace {
         }
 
     private:
-        Interface::Adaptor<IFile> m_file;
+        Interface::Adaptor<IStream> m_file;
 
         mutable void *m_archive;
         mutable struct RAROpenArchiveDataEx m_archiveData;
