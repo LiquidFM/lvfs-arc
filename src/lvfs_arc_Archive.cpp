@@ -46,7 +46,7 @@ namespace {
 
     public: /* IStream */
         virtual size_t read(void *buffer, size_t size) { return m_reader->read(buffer, size); }
-        virtual size_t write(const void *buffer, size_t size) { m_error = Error(EROFS); return false; }
+        virtual size_t write(const void *buffer, size_t size) { m_error = Error(EROFS); return 0; }
         virtual bool advise(off_t offset, off_t len, Advise advise) { m_error = Error(EROFS); return false; }
         virtual bool seek(long offset, Whence whence) { m_error = Error(EROFS); return false; }
         virtual bool flush() { m_error = Error(EROFS); return false; }

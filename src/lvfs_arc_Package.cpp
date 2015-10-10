@@ -36,6 +36,11 @@ const char *Package::name() const
     return "Arc";
 }
 
+Settings::Scope *Package::settings() const
+{
+    return NULL;
+}
+
 const Package::Plugin **Package::contentPlugins() const
 {
     static const LibArchive::Plugin libArchive;
