@@ -36,7 +36,7 @@ const char *Package::name() const
     return "Arc";
 }
 
-Settings::Scope *Package::settings() const
+Package::Settings *Package::settings() const
 {
     return NULL;
 }
