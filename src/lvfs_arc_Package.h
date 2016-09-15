@@ -1,7 +1,7 @@
 /**
  * This file is part of lvfs-arc.
  *
- * Copyright (C) 2011-2014 Dmitriy Vilkov, <dav.daemon@gmail.com>
+ * Copyright (C) 2011-2016 Dmitriy Vilkov, <dav.daemon@gmail.com>
  *
  * lvfs-arc is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,13 +20,13 @@
 #ifndef LVFS_ARC_PACKAGE_H_
 #define LVFS_ARC_PACKAGE_H_
 
-#include <lvfs/plugins/Package>
+#include <lvfs/plugins/IPackage>
 
 
 namespace LVFS {
 namespace Arc {
 
-class PLATFORM_MAKE_PRIVATE Package : public ::LVFS::Package
+class PLATFORM_MAKE_PRIVATE Package : public Implements<IPackage>
 {
     PLATFORM_MAKE_NONCOPYABLE(Package)
     PLATFORM_MAKE_NONMOVEABLE(Package)
@@ -37,7 +37,7 @@ public:
     virtual ~Package();
 
     virtual const char *name() const;
-    virtual Settings *settings() const;
+    virtual Settings::Scope *settings() const;
     virtual const Plugin **contentPlugins() const;
     virtual const Plugin **protocolPlugins() const;
 };

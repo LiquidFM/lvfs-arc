@@ -1,7 +1,7 @@
 /**
  * This file is part of lvfs-arc.
  *
- * Copyright (C) 2011-2014 Dmitriy Vilkov, <dav.daemon@gmail.com>
+ * Copyright (C) 2011-2016 Dmitriy Vilkov, <dav.daemon@gmail.com>
  *
  * lvfs-arc is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,8 @@
 #include "lvfs_arc_LibArchive.h"
 #include "lvfs_arc_LibUnrar.h"
 
+#include <lvfs/plugins/Package>
+
 
 namespace LVFS {
 namespace Arc {
@@ -36,7 +38,7 @@ const char *Package::name() const
     return "Arc";
 }
 
-Package::Settings *Package::settings() const
+Settings::Scope *Package::settings() const
 {
     return NULL;
 }
@@ -67,7 +69,7 @@ const Package::Plugin **Package::contentPlugins() const
         { "application/x-xz-compressed-tar",   libArchive },
         { "application/x-lzma-compressed-tar", libArchive },
         { "application/x-cd-image",            libArchive },
-        { "application/x-rar",                 libUnrar }
+        { "application/x-rar",                 libUnrar   }
     };
     enum { Count = sizeof(types) / sizeof(Plugin) };
 
@@ -87,4 +89,4 @@ const Package::Plugin **Package::protocolPlugins() const
 }}
 
 
-DECLARE_PLUGIN(::LVFS::Arc::Package)
+DECLARE_PLUGINS_PACKAGE(::LVFS::Arc::Package)
